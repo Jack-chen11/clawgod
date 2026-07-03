@@ -1105,6 +1105,30 @@ const patches = [
     replacer: () => '#22c55e',
   },
 
+  // ── Glob/Grep 工具恢复 ──
+
+  {
+    // Bun inlines EMBEDDED_SEARCH_TOOLS env as literal "true" at compile time.
+    // This makes bC() always return true → Wft() returns the shadow set
+    // containing "Glob" and "Grep" → those tools are hidden from the user.
+    // Under clawgod (Bun runtime, not native binary) the env is unset, but
+    // the code still says ct("true") instead of ct(process.env.EMBEDDED_SEARCH_TOOLS).
+    //
+    // Shape:
+    //   function bC(){if(!ct("true"))return!1;if(mEr())return!1;
+    //     return process.env.CLAUDE_CODE_ENTRYPOINT!=="local-agent"}
+    //
+    // Patch: replace ct("true") with ct(process.env.EMBEDDED_SEARCH_TOOLS)
+    // so the guard reads the actual env var (unset → falsy → return false →
+    // Glob/Grep tools available).
+    name: 'Restore Glob/Grep tools (un-inline EMBEDDED_SEARCH_TOOLS)',
+    pattern: /function ([\w$]+)\(\)\{if\(!([\w$]+)\("true"\)\)return!1;if\([\w$]+\(\)\)return!1;return process\.env\.CLAUDE_CODE_ENTRYPOINT!=="local-agent"\}/g,
+    replacer: (m, fn, envCheck) =>
+      `function ${fn}(){if(!${envCheck}(process.env.EMBEDDED_SEARCH_TOOLS))return!1;if(typeof globalThis.__dpBinOk>"u"){try{var _w=process.platform==="win32"?"where":"which";require("child_process").execFileSync(_w,["bfs"],{timeout:2e3});require("child_process").execFileSync(_w,["ugrep"],{timeout:2e3});globalThis.__dpBinOk=!0}catch{globalThis.__dpBinOk=!1}}if(!globalThis.__dpBinOk)return!1;return process.env.CLAUDE_CODE_ENTRYPOINT!=="local-agent"}`,
+    sentinel: 'ct("true")',
+    optional: true,
+  },
+
   // ── 地区隐写中和 (v2.1.197+) ──
 
   {
