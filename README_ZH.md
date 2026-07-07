@@ -88,7 +88,7 @@ irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | ie
 | **更新通知** | 每 24h 异步检查 GitHub releases（非阻塞），发现新版本时启动前显示一行提示 |
 | **精简设置** | 安装时自动合并省 token 配置到 `~/.claude/settings.json`——移除未使用的工具定义（DesignSync、NotebookEdit、Cron* 等）并禁用 Workflows/RemoteControl/Artifact，每轮节省数万 token |
 
-> **精简设置**不会破坏现有配置：只添加 `settings.json` 中不存在的键。完全关闭精简模式：`claude update --lean-off`。重新启用：`claude update --lean-on`。取消单项设置只需自行修改（如 `"disableArtifact": false`）。
+> **精简设置**不会破坏现有配置：只添加 `settings.json` 中不存在的键。随时切换：`claude --lean-off` / `claude --lean-on`（即时生效，无需重装）。取消单项设置只需自行修改（如 `"disableArtifact": false`）。
 
 ## 使用
 

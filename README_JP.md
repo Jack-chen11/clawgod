@@ -88,7 +88,7 @@ irm https://github.com/0Chencc/clawgod/releases/latest/download/install.ps1 | ie
 | **アップデート通知** | 24時間ごとに GitHub releases を非同期チェック（ノンブロッキング）。新バージョンが利用可能な場合、起動前に1行の通知を表示 |
 | **リーン設定** | インストール時にトークン節約のデフォルト設定を `~/.claude/settings.json` へ自動マージ — 未使用のツール定義（DesignSync、NotebookEdit、Cron* など）を削除し、Workflows/RemoteControl/Artifact を無効化。1ターンあたり数万トークンを節約 |
 
-> **リーン設定**は既存の設定を壊しません。`settings.json` に存在しないキーのみ追加されます。リーンモードを完全に無効化：`claude update --lean-off`。再有効化：`claude update --lean-on`。個別設定の解除は自分で値を設定してください（例：`"disableArtifact": false`）。
+> **リーン設定**は既存の設定を壊しません。`settings.json` に存在しないキーのみ追加されます。いつでも切替可能：`claude --lean-off` / `claude --lean-on`（即座に反映、再インストール不要）。個別設定の解除は自分で値を設定してください（例：`"disableArtifact": false`）。
 
 ## コマンド
 

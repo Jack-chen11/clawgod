@@ -18,7 +18,7 @@ VERSION="${CLAWGOD_VERSION:-latest}"
 NO_UPGRADE="${CLAWGOD_NO_UPGRADE:-}"
 LEAN_OFF="${CLAWGOD_LEAN_OFF:-}"
 LEAN_ON="${CLAWGOD_LEAN_ON:-}"
-CLAWGOD_SELF_VERSION="1.5.0"
+CLAWGOD_SELF_VERSION="1.5.1"
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -867,6 +867,39 @@ if (_realExecPath !== process.execPath) {
     value: _realExecPath,
     configurable: true,
   });
+}
+
+// Lean mode toggle — handle --lean-off / --lean-on before starting Claude
+if (process.argv.includes('--lean-off') || process.argv.includes('--lean-on')) {
+  const _leanFlag = join(clawgodDir, '.lean-disabled');
+  const _leanSettings = join(homedir(), '.claude', 'settings.json');
+  const _leanDeny = new Set(['DesignSync','NotebookEdit','PushNotification','RemoteTrigger','CronCreate','CronDelete','CronList']);
+  const _leanFlags = ['disableWorkflows','disableRemoteControl','disableClaudeAiConnectors','disableArtifact'];
+  if (process.argv.includes('--lean-off')) {
+    writeFileSync(_leanFlag, '');
+    try {
+      const _s = JSON.parse(readFileSync(_leanSettings, 'utf8'));
+      for (const _k of _leanFlags) delete _s[_k];
+      if (Array.isArray(_s.permissions?.deny)) _s.permissions.deny = _s.permissions.deny.filter(function(t) { return !_leanDeny.has(t); });
+      writeFileSync(_leanSettings, JSON.stringify(_s, null, 2) + '\n');
+    } catch {}
+    process.stderr.write('[clawgod] Lean mode disabled. Settings restored.\n');
+  } else {
+    try { require('fs').unlinkSync(_leanFlag); } catch {}
+    try {
+      let _s = {};
+      try { _s = JSON.parse(readFileSync(_leanSettings, 'utf8')); } catch {}
+      let _ch = false;
+      for (const _k of _leanFlags) { if (!(_k in _s)) { _s[_k] = true; _ch = true; } }
+      if (!_s.permissions) _s.permissions = {};
+      if (!Array.isArray(_s.permissions.deny)) _s.permissions.deny = [];
+      const _ex = new Set(_s.permissions.deny);
+      for (const _t of _leanDeny) { if (!_ex.has(_t)) { _s.permissions.deny.push(_t); _ch = true; } }
+      if (_ch) writeFileSync(_leanSettings, JSON.stringify(_s, null, 2) + '\n');
+    } catch {}
+    process.stderr.write('[clawgod] Lean mode enabled. Settings updated.\n');
+  }
+  process.exit(0);
 }
 
 // Update check — cached, non-blocking, 24h interval
