@@ -86,6 +86,9 @@ Green logo = patched. Orange logo = original.
 | **Third-Party Cache Fix** | Auto-disables `x-anthropic-billing-header` when `baseURL` is non-Anthropic. The header's per-request `cch` field breaks prompt-cache hit rate on DeepSeek / OneAPI / Bedrock / vLLM and any other Anthropic-compatible proxy. You no longer need to set `CLAUDE_CODE_ATTRIBUTION_HEADER=0` yourself. |
 | **Auto Re-patch** | Detects when the user's native Claude binary has been upgraded; transparently re-extracts and re-patches on next launch |
 | **Update Notification** | Checks GitHub releases once per 24h (async, non-blocking). Shows a one-line notice if a newer ClawGod version is available |
+| **Lean Settings** | Auto-merges token-saving defaults into `~/.claude/settings.json` on install — removes unused tool definitions (DesignSync, NotebookEdit, Cron*, etc.) and disables Workflows/RemoteControl/Artifact. Saves tens of thousands of tokens per turn |
+
+> **Lean Settings** are non-destructive: only keys absent from your `settings.json` are added. To disable lean mode entirely: `claude update --lean-off`. To re-enable: `claude update --lean-on`. To opt out of a single setting, set it yourself (e.g. `"disableArtifact": false`).
 
 ## Commands
 

@@ -16,7 +16,9 @@ CLAWGOD_DIR="$HOME/.clawgod"
 BIN_DIR="$HOME/.local/bin"
 VERSION="${CLAWGOD_VERSION:-latest}"
 NO_UPGRADE="${CLAWGOD_NO_UPGRADE:-}"
-CLAWGOD_SELF_VERSION="1.4.1"
+LEAN_OFF="${CLAWGOD_LEAN_OFF:-}"
+LEAN_ON="${CLAWGOD_LEAN_ON:-}"
+CLAWGOD_SELF_VERSION="1.5.0"
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -24,6 +26,8 @@ while [[ $# -gt 0 ]]; do
     --version) VERSION="$2"; shift 2 ;;
     --no-upgrade) NO_UPGRADE=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
+    --lean-off) LEAN_OFF=1; shift ;;
+    --lean-on) LEAN_ON=1; shift ;;
     *) shift ;;
   esac
 done
@@ -1058,6 +1062,8 @@ const patches = [
         `const _vi=_ua.indexOf("--version");` +
         `if(_vi>=0&&_ua[_vi+1])process.env.CLAWGOD_VERSION=_ua[_vi+1];` +
         `if(_ua.includes("--no-upgrade"))process.env.CLAWGOD_NO_UPGRADE="1";` +
+        `if(_ua.includes("--lean-off"))process.env.CLAWGOD_LEAN_OFF="1";` +
+        `if(_ua.includes("--lean-on"))process.env.CLAWGOD_LEAN_ON="1";` +
         `process.stderr.write("[clawgod] 'claude update' is handled by clawgod self-update.\\n[clawgod] To leave clawgod and use vanilla update: bash ~/.clawgod/install.sh --uninstall\\n[clawgod] Continuing now\\u2026\\n");` +
         `const _w=process.platform==='win32';` +
         `const _c=_w?['powershell','-NoProfile','-EncodedCommand','${psB64}']:['bash','-c','curl -fsSL https://github.com/0Chencc/clawgod/releases/latest/download/install.sh | bash'];` +
@@ -1447,6 +1453,71 @@ if [ ! -f "$CLAWGOD_DIR/features.json" ]; then
 }
 FEATURES_EOF
   info "Default features.json created"
+fi
+
+# ─── Lean mode: optimize ~/.claude/settings.json ─────
+# Merge token-saving defaults into the user's settings.json.
+# Only adds keys that are not already present — never overwrites user config.
+# Bare names in permissions.deny remove tool DEFINITIONS from the API payload
+# (not just block calls), saving 2-5K tokens per tool per turn.
+# Toggle: --lean-off disables, --lean-on re-enables. Persisted in .lean-disabled.
+
+LEAN_FLAG="$CLAWGOD_DIR/.lean-disabled"
+
+if [ "$LEAN_OFF" = "1" ]; then
+  touch "$LEAN_FLAG"
+  # Remove our lean keys from settings.json
+  CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+  if [ -f "$CLAUDE_SETTINGS" ]; then
+    node -e '
+const fs = require("fs");
+const p = process.argv[1];
+const leanDeny = new Set(["DesignSync","NotebookEdit","PushNotification","RemoteTrigger","CronCreate","CronDelete","CronList"]);
+const leanFlags = ["disableWorkflows","disableRemoteControl","disableClaudeAiConnectors","disableArtifact"];
+let s = {};
+try { s = JSON.parse(fs.readFileSync(p, "utf8")); } catch { process.exit(0); }
+for (const k of leanFlags) delete s[k];
+if (Array.isArray(s.permissions?.deny)) s.permissions.deny = s.permissions.deny.filter(t => !leanDeny.has(t));
+fs.writeFileSync(p, JSON.stringify(s, null, 2) + "\n");
+' "$CLAUDE_SETTINGS" 2>/dev/null
+  fi
+  info "Lean mode disabled (settings restored)"
+elif [ "$LEAN_ON" = "1" ]; then
+  rm -f "$LEAN_FLAG"
+  info "Lean mode re-enabled (will apply below)"
+fi
+
+if [ ! -f "$LEAN_FLAG" ]; then
+  CLAUDE_SETTINGS_DIR="$HOME/.claude"
+  CLAUDE_SETTINGS="$CLAUDE_SETTINGS_DIR/settings.json"
+  mkdir -p "$CLAUDE_SETTINGS_DIR"
+
+  node -e '
+const fs = require("fs");
+const settingsPath = process.argv[1];
+const defaults = {
+  permissions: { deny: ["DesignSync","NotebookEdit","PushNotification","RemoteTrigger","CronCreate","CronDelete","CronList"] },
+  disableWorkflows: true, disableRemoteControl: true, disableClaudeAiConnectors: true, disableArtifact: true
+};
+let settings = {};
+try { settings = JSON.parse(fs.readFileSync(settingsPath, "utf8")); } catch {}
+let changed = false;
+for (const [k, v] of Object.entries(defaults)) {
+  if (k === "permissions") continue;
+  if (!(k in settings)) { settings[k] = v; changed = true; }
+}
+if (!settings.permissions) settings.permissions = {};
+if (!Array.isArray(settings.permissions.deny)) settings.permissions.deny = [];
+const existing = new Set(settings.permissions.deny);
+for (const tool of defaults.permissions.deny) {
+  if (!existing.has(tool)) { settings.permissions.deny.push(tool); changed = true; }
+}
+if (changed) fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+' "$CLAUDE_SETTINGS" 2>/dev/null
+
+  info "Lean settings applied (~/.claude/settings.json)"
+else
+  dim "Lean mode disabled (--lean-on to re-enable)"
 fi
 
 # ─── Sanity check: ensure user's Bun can actually load cli.original.cjs ──
