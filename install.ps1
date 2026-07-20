@@ -900,7 +900,9 @@ Write-OK "Re-patch helper installed (repatch.mjs)"
 
 # NOTE: PowerShell here-string @'...'@ cannot contain a line starting with '@
 # The proxy source is identical to the install.sh version.
-$ProxySource = Get-Content (Join-Path $PSScriptRoot "openai-proxy.cjs") -Raw -ErrorAction SilentlyContinue
+# $PSScriptRoot is empty when run via iex (e.g. claude update → iex(irm $url)).
+# Join-Path "" "file" throws a terminating error that -ErrorAction cannot catch.
+try { $ProxySource = Get-Content (Join-Path $PSScriptRoot "openai-proxy.cjs") -Raw -ErrorAction Stop } catch { $ProxySource = $null }
 if (-not $ProxySource) {
   # Inline fallback: fetch from release assets
   $ProxySource = @'
@@ -1257,6 +1259,16 @@ if (hasProviderApiKey) {
 // Users can force re-enable with CLAUDE_CODE_ATTRIBUTION_HEADER=1 if needed.
 if (config.baseURL && !/anthropic\.com/i.test(config.baseURL)) {
   process.env.CLAUDE_CODE_ATTRIBUTION_HEADER ??= '0';
+  try {
+    const _rcSettings = join(homedir(), '.claude', 'settings.json');
+    if (existsSync(_rcSettings)) {
+      const _rcS = JSON.parse(readFileSync(_rcSettings, 'utf8'));
+      if (_rcS.disableRemoteControl) {
+        delete _rcS.disableRemoteControl;
+        writeFileSync(_rcSettings, JSON.stringify(_rcS, null, 2) + '\n');
+      }
+    }
+  } catch {}
 }
 
 if (config.timeoutMs) {

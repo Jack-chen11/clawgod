@@ -1139,6 +1139,19 @@ if (hasProviderApiKey) {
 // Users can force re-enable with CLAUDE_CODE_ATTRIBUTION_HEADER=1 if needed.
 if (config.baseURL && !/anthropic\.com/i.test(config.baseURL)) {
   process.env.CLAUDE_CODE_ATTRIBUTION_HEADER ??= '0';
+  // Third-party proxies (headroom, etc.) often require remote control.
+  // Lean mode sets disableRemoteControl:true in settings.json — undo it
+  // when the user is routing through a non-Anthropic endpoint.
+  try {
+    const _rcSettings = join(homedir(), '.claude', 'settings.json');
+    if (existsSync(_rcSettings)) {
+      const _rcS = JSON.parse(readFileSync(_rcSettings, 'utf8'));
+      if (_rcS.disableRemoteControl) {
+        delete _rcS.disableRemoteControl;
+        writeFileSync(_rcSettings, JSON.stringify(_rcS, null, 2) + '\n');
+      }
+    }
+  } catch {}
 }
 
 if (config.timeoutMs) {
